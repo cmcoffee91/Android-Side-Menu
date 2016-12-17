@@ -1,0 +1,392 @@
+<script>
+    //showChildItemProperties()...
+	function showChildItemProperties(childItemId){
+		Shadowbox.open({ 
+        	content:    "bt_childItem.php?appGuid=" + appGuid + "&BT_itemId=" + childItemId, 
+        	player:     "iframe", 
+        	height:     550, 
+        	width:      950 
+    	}); 
+	}
+</script>
+
+
+
+<!-- ##################################################### -->                   
+<!-- ############### child items list #################### -->
+<div class='cpExpandoBox colorLightBg' id="section_childItems">
+    <a href='#' onClick="fnExpandCollapse('box_childItems');return false;"><img src='../../images/arr_right.gif' alt='arrow' />Menu Items</a>
+    <div id="box_childItems" style="display:block;">
+
+		<div style='padding-top:10px;margin-bottom:10px;'>
+        	You can add and remove items manually using this form.
+          Follow these instructions after downloading your project:
+     <a href="https://www.dropbox.com/s/enimyl059eo7li2/cmNavDrawerInstructions.txt?dl=0" target="_blank">CM Side Menu Instructions</a> 
+        </div>
+        
+		<!-- child items list, loads with javascript -->
+		<div style='padding-top:10px;min-height:50px;'>
+            <table id="childItemTable" style="width:100%;border-spacing:0;border-collapse:collapse;">
+           		
+                <thead>
+                	<tr>
+                    	<td style='width:3%;border-bottom:1px solid gray;padding:5px;font-weight:bold;'>&nbsp;</td>
+                    	<td style='width:38%;border-bottom:1px solid gray;padding:5px;font-weight:bold;'>Row Title</td>
+                    	<td style='width:38%;border-bottom:1px solid gray;padding:5px;font-weight:bold;'>Tapping this row loads...</td>
+                    	<td style='border-bottom:1px solid gray;padding:5px;font-weight:bold;text-align:center;'>order</td>
+                    	<td style='width:15%;border-bottom:1px solid gray;padding:5px;padding-right:2px;text-align:right;white-space:no-wrap;'><a href='#' onClick="refreshList();return false;">refresh</a></td>
+                    </tr>
+                </thead>
+                <tbody>
+                
+                </tbody>
+                <tfoot>
+                
+                </tfoot>
+            </table>
+        	<div id="childItemLoadingMessage"></div>
+        </div>        
+        
+		<!-- add child item -->
+		<div style='padding:10px;padding-top:10px;min-height:50px;width:750px;white-space:nowrap;'>
+                        
+            <div style='padding-top:5px;float:left;width:250px;'>
+                <b>Add Row, Enter a Title</b><br/>
+                <input name='titleText' id='titleText' type='text' value="" style="width:225px"/>
+            </div>
+            
+            <div style='padding-top:5px;float:left;width:250px;'>
+                <b>Load Screen Nickname</b>         
+                &nbsp;&nbsp;
+                <a href="#" onClick="fnPickScreen('addScreenNicknameId', 'addScreenNickname');return false;"><img src="../../images/arr_right.gif" alt="arrow"/>Select</a>
+                <br/>
+                <input type="text" name="addScreenNickname" id="addScreenNickname" value="" style="width:225px">
+                <input type="hidden" name="addScreenNicknameId" id="addScreenNicknameId" value="">
+            </div>
+            
+            <div style='padding-top:5px;width:250px;'>
+                <b>Select a Plugin</b><br/>
+                <select name="addPluginType" id="addPluginType" style="width:225px;">
+                    <option value="">Select if creating a new screen...</option>
+                    <script>document.write(fnExecuteBackendCommand("getPluginOptions"));</script>
+                </select>
+           </div>
+             
+           <div style="margin:10px;margin-top:5px;margin-left:0px;">
+                <input type='button' id="addButton" title="add" value="add" align='absmiddle' class="buttonSubmit" onClick="fnAddItem();return false;">
+           </div>   
+    
+
+		</div>    
+        
+		
+		<script>
+			
+			
+			//flags for num rows, more rows available, etc...
+			var numRowsShowing = 0;
+			var numRowsAvailable = 0;
+			
+			//get the child items after this page loads...
+			var timeoutID = setTimeout(function(){
+				loadChildItems();
+			}, 500)			
+			
+			//loadChildItems...
+			function loadChildItems(){
+				
+				//reset counter...
+				numRowsShowing = 0;
+				numRowsAvailable = 0;
+				
+				//show a loading message...
+				$("#childItemLoadingMessage").html("<div class='loading' style='height:30px;padding-top:5px;'><img src='../../images/spinner.png' alt='spinner'></div>");
+				
+				//remove table rows from body and footer...
+				$('#childItemTable tbody').empty();
+				$('#childItemTable tfoot').empty();
+				
+				
+				//use the fnExecuteBackendCommand() function in app_screen.js to get a JSON list of items...
+				var res = fnExecuteBackendCommand("getChildItems");
+			
+				/*
+						res will be a list of childItem's JSON data plus some stats...
+						-------------------------------------------------------------------------------------					
+						{"result":"success", "startIndex":"0", "totalNumberOfChildItems":"4", 
+							"childItems":[
+								{"itemId":"111", "itemType":"BT_menuItem", "titleText":"Yahoo", "loadScreenNickname":"Yahoo", "loadScreenWithItemId":"412CC104BA310B348F729D5", "orderIndex":"1"},
+								{"itemId":"222", "itemType":"BT_menuItem", "titleText":"Google", "loadScreenNickname":"Google", "loadScreenWithItemId":"6F846B69656F799DE42822A", "orderIndex":"2"},
+								{....another child item...},
+								{....another child item...}
+							]
+						}					
+								
+				*/	
+				
+				var json = null;
+				try{
+					json = $.parseJSON(res);
+				}catch(err){
+				}
+				
+				//json loaded...
+				if(json == null){
+					$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while fetching some data (1). The results were not valid JSON.<br>" + res + "</div>");
+				}else{
+					
+					//parse the JSON, look for success or errors...
+					var status = "";
+					if(typeof(json.result) != "undefined") status = json.result;
+					if(status.toUpperCase() != "SUCCESS"){
+					
+						//message...
+						message = "<div style='padding-top:5px;padding-bottom:5px;color:#000000;font-family:monospace;'>";
+						message += res;
+						message += "</div>";
+					
+						//show each error...
+						$("#childItemLoadingMessage").html(message);
+						
+					}else{
+						
+						//the row we started with...
+						if(typeof(json.startIndex) != "undefined") startIndex = json.startIndex;
+						
+						//total rows...
+						var totalNumberOfChildItems = 0;
+						if(typeof(json.totalNumberOfChildItems) != "undefined") totalNumberOfChildItems = json.totalNumberOfChildItems;
+
+						//make sure table has no cellspacing or padding...
+						$("#childItemTable").css("width", "100%");
+						$("#childItemTable").css("border-spacing", "0");
+						$("#childItemTable").css("border-collapse", "collapse");
+						
+						//childItems...
+						var childItems = null;
+						if(typeof(json.childItems) != "undefined") childItems = json.childItems;
+						if(Object.prototype.toString.call(childItems) === "[object Array]"){
+							for(var i = 0; i < childItems.length; i++){
+								numRowsShowing = (numRowsShowing + 1);
+								var obj = childItems[i];
+								var rowCells = "";
+							
+								//titleText...
+								var titleText = "Item " + (i + 1);
+								if(obj["titleText"] != ""){
+									titleText = obj["titleText"];
+								}
+								
+								//loadScreenWithItemId...
+								var loadScreenWithItemId = "";
+								if(obj["loadScreenWithItemId"] != ""){
+									loadScreenWithItemId = obj["loadScreenWithItemId"];
+								}
+
+								//loadScreenNickname...
+								var loadScreenNickname = "";
+								if(obj["loadScreenNickname"] != ""){
+									loadScreenNickname = obj["loadScreenNickname"];
+								}
+
+								//link leading to loadScreen if we have one...
+								var loadScreenLink = "";
+								if(loadScreenWithItemId != "" && loadScreenNickname != ""){
+									loadScreenLink = "<a href='bt_screen.php?appGuid=" + appGuid + "&BT_itemId=" + loadScreenWithItemId + "' title='Details'>" + loadScreenNickname  + "</a>";
+								}
+										
+								//create cells for this row...
+								rowCells += "<td class='data' style='vertical-align:middle;width:20px;'><a href='#' onClick=\"showChildItemPropertiesJSON('" + obj["itemId"] + "');return false;\"><img src='../../images/code.png' alt='code' style='vertical-align:middle;'></a></td>";   
+								rowCells += "<td class='data' style='vertical-align:middle;'><a href='#' onClick=\"showChildItemProperties('" + obj["itemId"] + "');return false;\">" + titleText + "</a></td>";   
+								rowCells += "<td class='data' style='vertical-align:middle;'>" + loadScreenLink  + "</td>";   
+								rowCells += "<td class='data' style='vertical-align:middle;'><input type='text' name='order_" + obj["itemId"] + "' id='order_" + obj["itemId"] + "' value='" + obj["orderIndex"] + "' style='margin:0px;width:70px;text-align:center;font-size:8pt;'</td>"; 
+								rowCells += "<td class='data' style='vertical-align:middle;text-align:right'><a href='#' onclick=\"fnRemoveItem('" + obj["itemId"] + "');return false;\">delete</td>";   
+								
+								//add this row...
+								$("#childItemTable tbody").append("<tr id=\"row_" + i + "\">" + rowCells + "</tr>");
+								
+							}//for each row...
+							
+							//set alternating row colors...
+							$("table#childItemTable tr:even").addClass("rowAlt");
+							$("table#childItemTable tr:odd").addClass("rowNormal");
+							
+							//if we have rows, create the update button row for footer...
+							if(numRowsShowing > 0){
+								rowCells = "<td colspan='3' style='padding:5px;padding-left:0px;border-top:1px solid gray;'>";
+									rowCells += "&nbsp;";
+								rowCells += "</td>";
+								rowCells += "<td style='border-top:1px solid gray;width:70px;text-align:center;padding-top:3px;'>";
+                                	if(i > 1){
+										rowCells += "<input type='button' title='update' value='update' id='saveOrderButton' name='saveOrderButton' align='absmiddle' class='buttonSubmit' style='display:inline;margin:0px;' onClick=\"fnUpdateOrder();return false;\">";
+									}else{
+										rowCells += "&nbsp;";
+									}
+								rowCells += "</td>";
+								rowCells += "<td style='padding:5px;padding-right:0px;border-top:1px solid gray;text-align:right'>";
+									rowCells += (parseInt(startIndex) + 1) + " - " + numRowsShowing + " of " + totalNumberOfChildItems;
+								rowCells += "</td>";
+							}
+							
+							//add update button row to footer...
+							$("#childItemTable tfoot").html("<tr>" + rowCells + "</tr>");
+							
+						}//childItems object is array...
+
+						//hide loading message...
+						$("#childItemLoadingMessage").html("");
+						
+					}//success...
+					
+				}//json == null...
+				
+			} //load childItem...
+			
+			//refreshList()...
+			function refreshList(){
+				loadChildItems();
+			}
+			
+			//fnAddItem()...
+			function fnAddItem(){
+
+				//reference to the form...
+				var frm = document.forms[0];
+				
+				//create the JSON string to pass to use in childItemAddJson form element...
+				var newItemJson = "{";
+				newItemJson += "\"itemType\":\"BT_menuItem\", ";
+				newItemJson += "\"titleText\":\"" + frm.titleText.value + "\", ";
+				newItemJson += "\"addScreenNickname\":\"" + frm.addScreenNickname.value + "\", ";
+				newItemJson += "\"addPluginType\":\"" + frm.addPluginType.options[frm.addPluginType.selectedIndex].value + "\"";
+				newItemJson += "}";
+				
+				//set childItemAddJson in form on parent screen so backend routine receives it...
+				frm.childItemAddJson.value = newItemJson;
+				
+				//use the fnExecuteBackendCommand() function in app_screen.js to create a new childItem...
+				var res = fnExecuteBackendCommand("addChildItem");
+				
+				//res will be json response with "success" or error message... 
+				var json = null;
+				try{
+					json = $.parseJSON(res);
+				}catch(err){
+				}
+				
+				//json loaded...
+				if(json == null){
+					$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while adding this item (1).<br>" + res + "</div>");
+				}else{
+					
+					//parse the JSON, look for success or errors...
+					var status = "";
+					if(typeof(json.result) != "undefined") status = json.result;
+					
+					if(status.toUpperCase() == "SUCCESS"){
+					
+						//clear form...
+						frm.titleText.value = "";
+						frm.addScreenNickname.value = "";
+						
+						//refresh list...
+						refreshList();
+					
+					}else{
+						$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while adding this item (2).<br>" + res + "</div>");
+					}
+					
+				}
+				
+				
+			}
+
+			//fnRemoveItem()...
+			function fnRemoveItem(childItemId){
+
+				//set childItemId in form on parent screen so backend routine receives it...
+				document.forms[0].childItemId.value = childItemId;
+				
+				//use the fnExecuteBackendCommand() function in app_screen.js to remove this childItem...
+				var res = fnExecuteBackendCommand("removeChildItem");
+
+				//res will be json response with "success" or error message... 
+				var json = null;
+				try{
+					json = $.parseJSON(res);
+				}catch(err){
+				}
+				
+				//json loaded...
+				if(json == null){
+					$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while removing this item (1).<br>" + res + "</div>");
+				}else{
+					
+					//parse the JSON, look for success or errors...
+					var status = "";
+					if(typeof(json.result) != "undefined") status = json.result;
+					if(status.toUpperCase() == "SUCCESS"){
+					
+						//refresh list...
+						refreshList();
+					
+					
+					}else{
+						$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while removing this item (2).<br>" + res + "</div>");
+					}
+					
+				}
+				
+
+			}
+			
+			//fnUpdateOrder()...
+			function fnUpdateOrder(){
+				
+				//use the fnExecuteBackendCommand() function in app_screen.js to update the order of the childItems...
+				var res = fnExecuteBackendCommand("updateChildItemsOrder");
+
+				//res will be json response with "success" or error message... 
+				var json = null;
+				try{
+					json = $.parseJSON(res);
+				}catch(err){
+				}
+				
+				//json loaded...
+				if(json == null){
+					$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while updating the order (1).<br>" + res + "</div>");
+				}else{
+					
+					//parse the JSON, look for success or errors...
+					var status = "";
+					if(typeof(json.result) != "undefined") status = json.result;
+					if(status.toUpperCase() == "SUCCESS"){
+					
+						//refresh list...
+						refreshList();
+					
+					
+					}else{
+						$("#childItemLoadingMessage").html("<div style='color:red;padding:5px;'>A problem occurred while updating the order (1).<br>" + res + "</div>");
+					}
+					
+				}
+	
+			}			
+			
+		</script>
+
+
+        
+    </div>
+</div>
+<!-- ############### end child items list  ############### -->
+<!-- ##################################################### -->  
+
+
+
+
+
+
+                 
